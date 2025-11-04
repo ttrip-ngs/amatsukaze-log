@@ -222,6 +222,28 @@ Content-Type: application/json
 
 facility: user (1), severity: error (3) → priority: 11
 
+**CRITICAL判定条件（syslog/Zabbixアラート対象）:**
+
+以下のいずれかのパターンがTXTログに含まれる場合、`severity = "critical"` となりsyslog送信される:
+
+1. **Exceptionパターン**
+   - 正規表現: `Exception thrown`
+   - 例: `AMT [error] Exception thrown at TranscodeManager.cpp:593`
+
+2. **終了エラーパターン**
+   - 正規表現: `エラー.*終了します`
+   - 例: `Message: マッピングにないDRCS外字あり正常に字幕処理できなかったため終了します`
+
+3. **失敗パターン**
+   - 正規表現: `failed to` (大文字小文字区別なし)
+   - 例: `AMT [error] Failed to encode video stream`
+
+**syslog送信されないケース:**
+
+- `AMT [warn]` のみの警告（例: DRCS外字警告）
+- 警告多発（50件以上）でも正常完了した場合（status = "warning", severity = "warning"）
+- エンコード正常完了（status = "success", severity = "info"）
+
 **送信済み管理:**
 
 方式: SQLite ローカルDB

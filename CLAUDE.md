@@ -90,10 +90,24 @@ Amatsukazeログ(txt/json)
 }
 ```
 
-### エラー判定
-- CRITICAL: `AMT [error] Exception thrown` が存在
-- 成功: `AMT [info] Mux完了` または `AMT [info] [出力ファイル]` が存在
-- 警告多発: DRCS外字警告（`AMT [warn] [字幕] マッピングのないDRCS外字`）は頻出するが非CRITICAL
+### エラー判定とsyslog送信条件
+
+**CRITICAL判定（syslog/Zabbixアラート対象）:**
+
+以下のいずれかのパターンがTXTログに含まれる場合:
+- `Exception thrown`
+- `エラー.*終了します`
+- `failed to` (大文字小文字区別なし)
+
+具体例:
+- `AMT [error] Exception thrown at TranscodeManager.cpp:593`
+- `Message: マッピングにないDRCS外字あり正常に字幕処理できなかったため終了します`
+- `AMT [error] Failed to encode video stream`
+
+**syslog送信されないケース:**
+- `AMT [warn]` のみの警告（例: DRCS外字警告は頻出するが非CRITICAL）
+- 警告多発（50件以上）でも正常完了した場合
+- エンコード正常完了
 
 ## 送信データ形式
 
