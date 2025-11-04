@@ -1,0 +1,87 @@
+# amatsukaze-log 設定ファイル例
+#
+# このファイルをコピーして config.yaml として使用してください
+# cp config/config.example.yaml config/config.yaml
+
+# ログファイル監視設定
+watcher:
+  # ログディレクトリパス（Amatsukazeのログ出力先）
+  log_directory: /var/log/amatsukaze
+
+  # 監視対象ファイルパターン
+  file_pattern: "*.json"
+
+  # TXTファイル待機時間（秒）
+  # JSONファイル検知後、対応するTXTファイルの生成を待つ時間
+  txt_wait_timeout: 30
+
+  # ポーリング間隔（秒）
+  polling_interval: 5
+
+# ログ送信設定
+sender:
+  # Vector送信設定
+  vector:
+    # Vector送信の有効化
+    enabled: true
+
+    # VectorエンドポイントURL
+    endpoint: "http://vector:9000/amatsukaze"
+
+    # タイムアウト（秒）
+    timeout: 10
+
+    # 最大リトライ回数
+    retry_max: 5
+
+    # リトライバックオフ係数（exponential backoff）
+    retry_backoff_base: 2
+
+  # rsyslogd送信設定
+  syslog:
+    # syslog送信の有効化（CRITICALエラーのみ）
+    enabled: true
+
+    # rsyslogdホスト
+    host: rsyslogd
+
+    # syslogポート
+    port: 514
+
+    # プロトコル（udp または tcp）
+    protocol: udp
+
+    # syslog facility
+    facility: user
+
+  # 送信済み管理DB設定
+  database:
+    # DBファイルパス
+    path: /data/processed_logs.db
+
+# ログパーサー設定
+parser:
+  # ファイルエンコーディング（UTF-8 with BOM）
+  encoding: utf-8-sig
+
+  # 最大ログ行数（大量ログ対策）
+  max_log_lines: 10000
+
+# ロギング設定
+logging:
+  # ログレベル（DEBUG, INFO, WARNING, ERROR, CRITICAL）
+  level: INFO
+
+  # ログフォーマット（text または json）
+  format: json
+
+  # 出力先（stdout または stderr）
+  output: stdout
+
+# アプリケーション設定
+app:
+  # 並列処理数
+  worker_threads: 2
+
+  # 処理キューサイズ
+  queue_size: 100
