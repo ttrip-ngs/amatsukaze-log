@@ -67,6 +67,171 @@ parser:
   # 最大ログ行数（大量ログ対策）
   max_log_lines: 10000
 
+  # CRITICAL判定ルール
+  # type: pattern（正規表現パターンマッチ） or condition（条件式評価）
+  critical_rules:
+    # ========================================
+    # デフォルトルール（推奨: 有効）
+    # ========================================
+
+    - name: "exception"
+      type: "pattern"
+      pattern: "Exception thrown"
+      enabled: true
+
+    - name: "error_termination"
+      type: "pattern"
+      pattern: "エラー.*終了します"
+      enabled: true
+
+    - name: "failed"
+      type: "pattern"
+      pattern: "failed to"
+      case_sensitive: false
+      enabled: true
+
+    # ========================================
+    # 音声関連ルール
+    # ========================================
+
+    # 音ずれ: 最大100ms以上
+    - name: "audio_desync_moderate"
+      type: "condition"
+      condition: "audiodiff.maxdiff > 100.0"
+      enabled: true
+      message: "音ずれ検出: {audiodiff.maxdiff}ms"
+
+    # 音ずれ重大: 最大500ms以上
+    - name: "audio_desync_severe"
+      type: "condition"
+      condition: "audiodiff.maxdiff > 500.0"
+      enabled: false  # 100msルールと重複するため無効化推奨
+      message: "音ずれ重大: {audiodiff.maxdiff}ms"
+
+    # 音声フレームロス: 1%以上
+    - name: "audio_frame_loss"
+      type: "condition"
+      condition: "audiodiff.notincludedper > 1.0"
+      enabled: false
+      message: "音声フレームロス: {audiodiff.notincludedper}%"
+
+    # ========================================
+    # 圧縮関連ルール
+    # ========================================
+
+    # 圧縮率異常: 3.0未満（10GB以上のファイル限定）
+    - name: "low_compression"
+      type: "condition"
+      condition: "compression_ratio < 3.0 and src_filesize > 10000000000"
+      enabled: false
+      message: "圧縮率異常: {compression_ratio}"
+
+    # 圧縮率異常（厳格版）: 2.0未満
+    - name: "low_compression_strict"
+      type: "condition"
+      condition: "compression_ratio < 2.0"
+      enabled: false
+      message: "圧縮率異常（厳格）: {compression_ratio}"
+
+    # ========================================
+    # ファイルサイズ関連ルール
+    # ========================================
+
+    # 出力ファイルサイズ異常: 100MB未満
+    - name: "small_output_file"
+      type: "condition"
+      condition: "out_filesize < 104857600"
+      enabled: false
+      message: "出力ファイル異常に小さい: {out_filesize}bytes"
+
+    # 出力ファイルサイズ異常: 入力の5%未満
+    - name: "output_too_small"
+      type: "condition"
+      condition: "out_filesize < 52428800 and compression_ratio > 100"
+      enabled: false
+      message: "出力ファイル異常: 入力の{compression_ratio}分の1"
+
+    # ========================================
+    # 処理時間関連ルール
+    # ========================================
+
+    # 長時間録画の異常: 2時間以上のソース
+    - name: "long_duration_source"
+      type: "condition"
+      condition: "src_duration > 7200"
+      enabled: false
+      message: "長時間録画検出: {src_duration}秒"
+
+    # CM削除異常: 出力が入力の30%未満
+    - name: "excessive_cm_cut"
+      type: "condition"
+      condition: "out_duration < 1800 and src_duration > 6000"
+      enabled: false
+      message: "CM削除異常: 入力{src_duration}秒 → 出力{out_duration}秒"
+
+    # ========================================
+    # ハードウェアエラー関連ルール
+    # ========================================
+
+    - name: "gpu_error"
+      type: "pattern"
+      pattern: "CUDA error|OpenCL error|GPU.*failed"
+      enabled: false
+      message: "GPUエラー検出"
+
+    - name: "disk_error"
+      type: "pattern"
+      pattern: "No space left on device|I/O error|disk.*full"
+      case_sensitive: false
+      enabled: false
+      message: "ディスクエラー検出"
+
+    - name: "memory_error"
+      type: "pattern"
+      pattern: "Out of memory|Cannot allocate memory"
+      case_sensitive: false
+      enabled: false
+      message: "メモリエラー検出"
+
+    # ========================================
+    # エンコーダ固有エラー
+    # ========================================
+
+    - name: "qsv_error"
+      type: "pattern"
+      pattern: "QSV.*error|mfxStatus"
+      enabled: false
+      message: "QSVエラー検出"
+
+    - name: "nvenc_error"
+      type: "pattern"
+      pattern: "NVENC.*error|NV_ENC_ERR"
+      enabled: false
+      message: "NVENCエラー検出"
+
+    # ========================================
+    # カスタムルール例（コメントアウト）
+    # ========================================
+
+    # 特定キーワード検出
+    # - name: "custom_keyword"
+    #   type: "pattern"
+    #   pattern: "特定のエラーメッセージ"
+    #   enabled: true
+
+    # 複合条件例（括弧、not演算子もサポート）
+    # - name: "complex_condition"
+    #   type: "condition"
+    #   condition: "compression_ratio < 5.0 and audiodiff.maxdiff > 200.0"
+    #   enabled: true
+    #   message: "複合エラー: 低圧縮率 + 音ずれ"
+
+    # - name: "advanced_condition"
+    #   type: "condition"
+    #   condition: "(compression_ratio < 3.0 and src_filesize > 10000000000) or not (audiodiff.maxdiff < 50)"
+    #   enabled: true
+    #   message: "高度な条件: 大ファイル低圧縮 または 音ずれ"
+
 # ロギング設定
 logging:
   # ログレベル（DEBUG, INFO, WARNING, ERROR, CRITICAL）

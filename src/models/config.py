@@ -58,11 +58,28 @@ class SenderConfig(BaseModel):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
 
 
+class CriticalRule(BaseModel):
+    """CRITICAL判定ルール"""
+
+    name: str = Field(description="ルール名")
+    type: Literal["pattern", "condition"] = Field(description="ルールタイプ")
+    pattern: str | None = Field(default=None, description="正規表現パターン（type=patternの場合）")
+    condition: str | None = Field(
+        default=None, description="条件式（type=conditionの場合）"
+    )
+    case_sensitive: bool = Field(default=True, description="大文字小文字を区別（patternの場合）")
+    enabled: bool = Field(default=True, description="ルール有効化")
+    message: str | None = Field(default=None, description="カスタムメッセージ")
+
+
 class ParserConfig(BaseModel):
     """ログパーサー設定"""
 
     encoding: str = Field(default="utf-8-sig", description="ファイルエンコーディング")
     max_log_lines: int = Field(default=10000, description="最大ログ行数")
+    critical_rules: list[CriticalRule] = Field(
+        default_factory=list, description="CRITICAL判定ルール"
+    )
 
 
 class LoggingConfig(BaseModel):

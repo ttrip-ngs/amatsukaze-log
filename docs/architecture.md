@@ -224,19 +224,58 @@ facility: user (1), severity: error (3) → priority: 11
 
 **CRITICAL判定条件（syslog/Zabbixアラート対象）:**
 
-以下のいずれかのパターンがTXTログに含まれる場合、`severity = "critical"` となりsyslog送信される:
+CRITICAL判定は `config/config.yaml` の `parser.critical_rules` で柔軟にカスタマイズ可能です。
+ルールには2つのタイプがあります:
 
-1. **Exceptionパターン**
-   - 正規表現: `Exception thrown`
-   - 例: `AMT [error] Exception thrown at TranscodeManager.cpp:593`
+1. **patternルール（正規表現マッチ）**
+   - TXTログメッセージに対して正規表現でパターンマッチ
+   - デフォルト有効ルール例:
+     - `Exception thrown` - 例外発生
+     - `エラー.*終了します` - エラー終了メッセージ
+     - `failed to` (大文字小文字区別なし) - 処理失敗
 
-2. **終了エラーパターン**
-   - 正規表現: `エラー.*終了します`
-   - 例: `Message: マッピングにないDRCS外字あり正常に字幕処理できなかったため終了します`
+2. **conditionルール（条件式評価）**
+   - JSONログの統計値に対して条件式で評価
+   - デフォルト有効ルール例:
+     - `audiodiff.maxdiff > 100.0` - 音ずれ100ms以上
+   - その他サンプルルール（デフォルト無効）:
+     - `compression_ratio < 3.0 and src_filesize > 10000000000` - 大ファイルの圧縮率異常
+     - `out_filesize < 104857600` - 出力ファイル100MB未満
+     - GPU/ディスク/メモリエラー検出パターン
 
-3. **失敗パターン**
-   - 正規表現: `failed to` (大文字小文字区別なし)
-   - 例: `AMT [error] Failed to encode video stream`
+**条件式で使用可能なフィールド:**
+- `compression_ratio` - 圧縮率（入力サイズ÷出力サイズ）
+- `src_filesize`, `out_filesize` - ファイルサイズ（bytes）
+- `src_duration`, `out_duration` - 再生時間（秒）
+- `audiodiff.maxdiff` - 最大音ずれ（ms）
+- `audiodiff.avgdiff` - 平均音ずれ（ms）
+- `audiodiff.notincludedper` - 音声フレームロス率（%）
+
+**条件式でサポートする演算子:**
+- 比較: `>`, `<`, `>=`, `<=`, `==`, `!=`
+- 論理: `and`, `or`, `not`
+- 括弧: `( )`
+- 算術: `+`, `-`, `*`, `/`, `%`, `**`
+
+条件式評価には安全な式評価ライブラリ `simpleeval` を使用しており、任意コード実行のリスクはありません。
+
+**ルール設定例:**
+```yaml
+parser:
+  critical_rules:
+    - name: "audio_desync_moderate"
+      type: "condition"
+      condition: "audiodiff.maxdiff > 100.0"
+      enabled: true
+      message: "音ずれ検出: {audiodiff.maxdiff}ms"
+
+    - name: "exception"
+      type: "pattern"
+      pattern: "Exception thrown"
+      enabled: true
+```
+
+詳細なルールサンプルは `config/config.example.yaml` を参照してください。
 
 **syslog送信されないケース:**
 

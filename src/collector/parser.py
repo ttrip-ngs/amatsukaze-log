@@ -8,6 +8,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from src.models.config import CriticalRule
 from src.models.log_entry import (
     AudioDiff,
     ErrorCounts,
@@ -20,6 +21,7 @@ from src.models.log_entry import (
     PhaseInfo,
     TxtLogData,
 )
+from src.utils.condition_evaluator import ConditionEvaluator
 
 
 class LogParser:
@@ -36,22 +38,23 @@ class LogParser:
         "mux": re.compile(r"Mux完了:\s+([\d.]+)秒"),
     }
 
-    # CRITICALエラーパターン
-    CRITICAL_PATTERNS = [
-        re.compile(r"Exception thrown"),
-        re.compile(r"エラー.*終了します"),
-        re.compile(r"failed to", re.IGNORECASE),
-    ]
-
-    def __init__(self, encoding: str = "utf-8-sig", max_log_lines: int = 10000):
+    def __init__(
+        self,
+        encoding: str = "utf-8-sig",
+        max_log_lines: int = 10000,
+        critical_rules: list[CriticalRule] | None = None,
+    ):
         """初期化
 
         Args:
             encoding: ファイルエンコーディング
             max_log_lines: 最大ログ行数
+            critical_rules: CRITICAL判定ルール（YAML設定から読み込み）
         """
         self.encoding = encoding
         self.max_log_lines = max_log_lines
+        self.critical_rules = critical_rules or []
+        self.condition_evaluator = ConditionEvaluator()
 
     def parse_txt_log(self, txt_path: Path) -> TxtLogData:
         """TXTログファイル解析
@@ -116,10 +119,17 @@ class LogParser:
                 elif level == "debug":
                     error_summary.debug_count += 1
 
-                # CRITICALエラー判定
-                if any(pattern.search(message) for pattern in self.CRITICAL_PATTERNS):
-                    has_critical_error = True
-                    error_summary.critical_errors.append(message)
+                # CRITICALエラー判定（パターンルール）
+                for rule in self.critical_rules:
+                    if not rule.enabled or rule.type != "pattern":
+                        continue
+
+                    if rule.pattern:
+                        flags = 0 if rule.case_sensitive else re.IGNORECASE
+                        if re.search(rule.pattern, message, flags):
+                            has_critical_error = True
+                            error_summary.critical_errors.append(message)
+                            break
 
             # 処理フェーズ判定
             self._update_phases(line, phases)
@@ -208,8 +218,23 @@ class LogParser:
         # タイムスタンプ（ファイル名から）
         timestamp = self._parse_timestamp(json_data.task_id)
 
-        # ステータス判定
-        status = self._determine_status(txt_data, json_data)
+        # 圧縮率計算（条件式評価に必要なため先に計算）
+        compression_ratio = (
+            json_data.srcfilesize / json_data.outfilesize if json_data.outfilesize > 0 else 0.0
+        )
+
+        # 条件式ルール評価用の統合データ（簡易版）
+        integrated_data = {
+            "compression_ratio": round(compression_ratio, 2),
+            "src_filesize": json_data.srcfilesize,
+            "out_filesize": json_data.outfilesize,
+            "src_duration": json_data.srcduration,
+            "out_duration": json_data.outduration,
+            "audiodiff": json_data.audiodiff.model_dump() if json_data.audiodiff else {},
+        }
+
+        # ステータス判定（パターンルール + 条件式ルール）
+        status = self._determine_status(txt_data, json_data, integrated_data)
 
         # 重要度判定
         severity = self._determine_severity(txt_data, status)
@@ -222,11 +247,6 @@ class LogParser:
 
         # 出力パス
         out_path = json_data.outfiles[0].path if json_data.outfiles else None
-
-        # 圧縮率計算
-        compression_ratio = (
-            json_data.srcfilesize / json_data.outfilesize if json_data.outfilesize > 0 else 0.0
-        )
 
         # エラーメッセージ
         error_message = None
@@ -308,23 +328,41 @@ class LogParser:
         return datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S.%f")
 
     def _determine_status(
-        self, txt_data: TxtLogData, json_data: JsonLogData
+        self, txt_data: TxtLogData, json_data: JsonLogData, integrated_data: dict
     ) -> str:  # Literal["success", "failed", "warning"]
         """ステータス判定
 
         Args:
             txt_data: TXTログデータ
             json_data: JSONログデータ
+            integrated_data: 統合データ（条件式評価用）
 
         Returns:
             str: ステータス (success/failed/warning)
         """
+        # パターンルールでCRITICAL判定済み
         if txt_data.has_critical_error:
             return "failed"
-        elif txt_data.error_summary.warn_count > 50:  # 警告多発
+
+        # 条件式ルールでCRITICAL判定
+        for rule in self.critical_rules:
+            if not rule.enabled or rule.type != "condition":
+                continue
+
+            if rule.condition:
+                try:
+                    if self.condition_evaluator.evaluate(rule.condition, integrated_data):
+                        # 条件一致したらfailed扱い
+                        return "failed"
+                except ValueError:
+                    # 条件式エラーは無視（ログ出力は将来対応）
+                    pass
+
+        # 警告多発
+        if txt_data.error_summary.warn_count > 50:
             return "warning"
-        else:
-            return "success"
+
+        return "success"
 
     def _determine_severity(
         self, txt_data: TxtLogData, status: str

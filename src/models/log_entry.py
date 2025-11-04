@@ -50,13 +50,17 @@ class TxtLogData(BaseModel):
 class AudioDiff(BaseModel):
     """音声差分情報"""
 
-    total_src_frames: int = Field(description="入力総フレーム数")
-    total_out_frames: int = Field(description="出力総フレーム数")
-    total_out_unique_frames: int = Field(description="出力ユニークフレーム数")
-    not_included_per: float = Field(description="未含有率")
-    avg_diff: float = Field(description="平均差分")
-    max_diff: float = Field(description="最大差分")
-    max_diff_pos: float = Field(description="最大差分位置")
+    total_src_frames: int = Field(description="入力総フレーム数", alias="totalsrcframes")
+    total_out_frames: int = Field(description="出力総フレーム数", alias="totaloutframes")
+    total_out_unique_frames: int = Field(
+        description="出力ユニークフレーム数", alias="totaloutuniqueframes"
+    )
+    not_included_per: float = Field(description="未含有率", alias="notincludedper")
+    avg_diff: float = Field(description="平均差分", alias="avgdiff")
+    max_diff: float = Field(description="最大差分", alias="maxdiff")
+    max_diff_pos: float = Field(description="最大差分位置", alias="maxdiffpos")
+
+    model_config = {"populate_by_name": True}
 
 
 class ErrorCounts(BaseModel):

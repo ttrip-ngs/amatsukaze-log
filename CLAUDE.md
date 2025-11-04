@@ -92,9 +92,11 @@ Amatsukazeログ(txt/json)
 
 ### エラー判定
 
-- CRITICAL: Exception、エラー終了、failed等のパターンで判定
+- CRITICAL: YAMLベースのルールエンジンで柔軟にカスタマイズ可能
+  - パターンルール: 正規表現でログメッセージマッチ（Exception、エラー終了、failed等）
+  - 条件式ルール: JSON統計値で評価（音ずれ、圧縮率、ファイルサイズ等）
 - 警告のみ: syslogに送信しない（Lokiのみ）
-- 詳細な判定条件は [docs/architecture.md](docs/architecture.md) 参照
+- 詳細な判定条件とルール設定は [docs/architecture.md](docs/architecture.md) 参照
 
 ## 送信データ形式
 
