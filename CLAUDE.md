@@ -90,24 +90,11 @@ Amatsukazeログ(txt/json)
 }
 ```
 
-### エラー判定とsyslog送信条件
+### エラー判定
 
-**CRITICAL判定（syslog/Zabbixアラート対象）:**
-
-以下のいずれかのパターンがTXTログに含まれる場合:
-- `Exception thrown`
-- `エラー.*終了します`
-- `failed to` (大文字小文字区別なし)
-
-具体例:
-- `AMT [error] Exception thrown at TranscodeManager.cpp:593`
-- `Message: マッピングにないDRCS外字あり正常に字幕処理できなかったため終了します`
-- `AMT [error] Failed to encode video stream`
-
-**syslog送信されないケース:**
-- `AMT [warn]` のみの警告（例: DRCS外字警告は頻出するが非CRITICAL）
-- 警告多発（50件以上）でも正常完了した場合
-- エンコード正常完了
+- CRITICAL: Exception、エラー終了、failed等のパターンで判定
+- 警告のみ: syslogに送信しない（Lokiのみ）
+- 詳細な判定条件は [docs/architecture.md](docs/architecture.md) 参照
 
 ## 送信データ形式
 
