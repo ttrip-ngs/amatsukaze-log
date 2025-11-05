@@ -157,7 +157,15 @@ class TestLogParser:
             error={"unknown-pts": 0},
             cmanalyze=True,
         )
-        assert parser._determine_status(txt_data_success, json_data) == "success"
+        integrated_data = {
+            "compression_ratio": 1.25,
+            "src_filesize": 100,
+            "out_filesize": 80,
+        }
+        assert (
+            parser._determine_status(txt_data_success, json_data, integrated_data)
+            == "success"
+        )
 
         # 失敗ケース
         txt_data_failed = TxtLogData(
@@ -165,7 +173,9 @@ class TestLogParser:
             has_critical_error=True,
             error_summary=ErrorSummary(error_count=1, critical_errors=["Error"]),
         )
-        assert parser._determine_status(txt_data_failed, json_data) == "failed"
+        assert (
+            parser._determine_status(txt_data_failed, json_data, integrated_data) == "failed"
+        )
 
         # 警告ケース
         txt_data_warning = TxtLogData(
@@ -173,4 +183,7 @@ class TestLogParser:
             has_critical_error=False,
             error_summary=ErrorSummary(warn_count=100),
         )
-        assert parser._determine_status(txt_data_warning, json_data) == "warning"
+        assert (
+            parser._determine_status(txt_data_warning, json_data, integrated_data)
+            == "warning"
+        )

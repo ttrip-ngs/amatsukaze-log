@@ -1,0 +1,95 @@
+services:
+  # Amatsukaze Log Collector
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: amatsukaze-collector
+    volumes:
+      # ソースコードをマウント（ホットリロード）
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./tests:/app/tests
+      # サンプルログをマウント
+      - ./tmp/sample_log:/var/log/amatsukaze:ro
+      # 送信済みDB永続化
+      - collector-data:/app/data
+    environment:
+      - LOG_LEVEL=DEBUG
+      - CONFIG_PATH=/app/config/config.yaml
+    depends_on:
+      - vector
+      - rsyslogd
+    networks:
+      - amatsukaze-net
+    # 開発時はテストコマンドを実行
+    command: ["python", "-m", "pytest", "tests/", "-v"]
+
+  # rsyslogd
+  rsyslogd:
+    image: rsyslog/syslog_appliance_alpine:latest
+    container_name: amatsukaze-rsyslog
+    ports:
+      - "514:514/udp"
+      - "514:514/tcp"
+    volumes:
+      # - ./config/rsyslog.conf:/etc/rsyslog.conf:ro  # TODO: 設定ファイル作成後に有効化
+      - rsyslog-logs:/var/log
+    networks:
+      - amatsukaze-net
+
+  # Vector (ログルーター)
+  vector:
+    image: timberio/vector:latest-alpine
+    container_name: amatsukaze-vector
+    ports:
+      - "9000:9000"  # HTTP source
+    volumes:
+      # - ./config/vector.toml:/etc/vector/vector.toml:ro  # TODO: 設定ファイル作成後に有効化
+      - /dev/null:/etc/vector/vector.toml:ro  # 空設定で起動
+    depends_on:
+      - loki
+    networks:
+      - amatsukaze-net
+
+  # Loki (ログ保存)
+  loki:
+    image: grafana/loki:latest
+    container_name: amatsukaze-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      # - ./config/loki.yaml:/etc/loki/local-config.yaml:ro  # TODO: 設定ファイル作成後に有効化
+      - loki-data:/loki
+    # デフォルト設定で起動
+    networks:
+      - amatsukaze-net
+
+  # Grafana (可視化)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: amatsukaze-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - loki
+    networks:
+      - amatsukaze-net
+
+volumes:
+  collector-data:
+  rsyslog-logs:
+  loki-data:
+  grafana-data:
+
+networks:
+  amatsukaze-net:
+    driver: bridge

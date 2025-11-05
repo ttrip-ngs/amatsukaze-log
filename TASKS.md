@@ -2,59 +2,72 @@
 
 ## 現在のステータス
 
-プロジェクト初期セットアップ段階
+Phase 2: コア機能実装中
+- Phase 1: プロジェクトセットアップ完了
+- Phase 2.1: データモデル実装完了
+- Phase 2.2: ログパーサー実装完了（YAMLベースのカスタムルールシステム含む）
+- 次: Phase 2.3 ログ監視機能実装
 
 ## タスク一覧
 
-### Phase 1: プロジェクトセットアップ
+### Phase 1: プロジェクトセットアップ ✅
 
-- [ ] プロジェクト構造作成
-  - [ ] ディレクトリ構成作成
-  - [ ] pyproject.toml 作成
-  - [ ] requirements.txt 作成
-  - [ ] .gitignore 作成
-  - [ ] README.md 作成
+- [x] プロジェクト構造作成
+  - [x] ディレクトリ構成作成
+  - [x] pyproject.toml 作成
+  - [x] ~~requirements.txt 作成~~ (pyproject.tomlに統一)
+  - [x] .gitignore 作成
+  - [x] README.md 作成
 
-- [ ] 開発環境セットアップ
-  - [ ] pre-commit 設定
-  - [ ] ruff 設定
-  - [ ] mypy 設定
-  - [ ] pytest 設定
+- [x] 開発環境セットアップ
+  - [x] pre-commit 設定
+  - [x] ruff 設定
+  - [x] mypy 設定
+  - [x] pytest 設定
 
 ### Phase 2: コア機能実装
 
-#### 2.1 データモデル実装
+#### 2.1 データモデル実装 ✅
 
-- [ ] 設定モデル実装 (models/config.py)
-  - [ ] YAML読み込み
-  - [ ] バリデーション
-  - [ ] デフォルト値設定
+- [x] 設定モデル実装 (models/config.py)
+  - [x] YAML読み込み
+  - [x] バリデーション
+  - [x] デフォルト値設定
+  - [x] CriticalRuleモデル追加（YAMLカスタムルール）
 
-- [ ] ログエントリモデル実装 (models/log_entry.py)
-  - [ ] TXTログ構造定義
-  - [ ] JSON構造定義
-  - [ ] 統合データ構造定義
+- [x] ログエントリモデル実装 (models/log_entry.py)
+  - [x] TXTログ構造定義
+  - [x] JSON構造定義
+  - [x] 統合データ構造定義
+  - [x] AudioDiffモデルのJSON alias対応
 
-#### 2.2 ログパーサー実装
+#### 2.2 ログパーサー実装 ✅
 
-- [ ] TXTログパーサー (collector/parser.py)
-  - [ ] UTF-8 BOM対応
-  - [ ] ログレベル抽出 (info/warn/error/debug)
-  - [ ] エラーメッセージ抽出
-  - [ ] 処理フェーズ判定
-  - [ ] 統計情報集計
+- [x] TXTログパーサー (collector/parser.py)
+  - [x] UTF-8 BOM対応
+  - [x] ログレベル抽出 (info/warn/error/debug)
+  - [x] エラーメッセージ抽出
+  - [x] 処理フェーズ判定
+  - [x] 統計情報集計
+  - [x] YAMLパターンルールによるCRITICAL判定
 
-- [ ] JSONパーサー (collector/parser.py)
-  - [ ] JSONファイル読み込み
-  - [ ] メタデータ抽出
-  - [ ] 番組名抽出
-  - [ ] 圧縮率計算
+- [x] JSONパーサー (collector/parser.py)
+  - [x] JSONファイル読み込み
+  - [x] メタデータ抽出
+  - [x] 番組名抽出
+  - [x] 圧縮率計算
 
-- [ ] 統合データ生成 (collector/parser.py)
-  - [ ] TXT + JSON データマージ
-  - [ ] ステータス判定 (success/failed/warning)
-  - [ ] 重要度判定 (info/warning/critical)
-  - [ ] Lokiラベル生成 (service/status/severity/encoder等)
+- [x] 統合データ生成 (collector/parser.py)
+  - [x] TXT + JSON データマージ
+  - [x] ステータス判定 (success/failed/warning)
+  - [x] 重要度判定 (info/warning/critical)
+  - [x] Lokiラベル生成 (service/status/severity/encoder等)
+  - [x] YAML条件式ルールによるCRITICAL判定
+
+- [x] 条件式評価器実装 (utils/condition_evaluator.py)
+  - [x] simpleeval導入で安全な式評価
+  - [x] ドット記法サポート (audiodiff.maxdiff等)
+  - [x] 複雑な論理式サポート (括弧、not演算子)
 
 #### 2.3 ログ監視機能実装
 
@@ -214,10 +227,16 @@
 - [x] CLAUDE.md 作成
 - [x] docs/architecture.md 作成
 - [x] TASKS.md 作成（本ファイル）
+- [x] Phase 1: プロジェクトセットアップ完了
+- [x] Phase 2.1: データモデル実装完了
+- [x] Phase 2.2: ログパーサー実装完了
+  - [x] YAMLベースのカスタムCRITICALルールシステム実装
+  - [x] simpleeval導入で安全性向上
+  - [x] Python 3.12+対応、全ライブラリ最新化
 
 ## 次のアクション
 
-Phase 1: プロジェクトセットアップから開始
+Phase 2.3: ログ監視機能実装（watchdogによるファイル監視）
 
 ## 備考
 
