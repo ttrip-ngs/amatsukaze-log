@@ -78,7 +78,7 @@ Amatsukazeエンコーダのログを収集し、Loki/Grafanaで可視化、Zabb
 
 **技術選定:**
 - Python watchdog ライブラリ（inotify wrapper）
-- 非同期I/O（asyncio）
+- スレッドベースの非同期処理（シンプルで堅牢）
 
 **動作フロー:**
 ```
@@ -420,11 +420,6 @@ logging:
   level: INFO
   format: "json"
   output: stdout
-
-# アプリケーション設定
-app:
-  worker_threads: 2  # 並列処理数
-  queue_size: 100    # 処理キューサイズ
 ```
 
 ## ディレクトリ構造
@@ -500,15 +495,11 @@ amatsukaze-log/
    - inotify 使用（ポーリングより効率的）
    - イベントドリブンで CPU 負荷最小化
 
-2. **並列処理**
-   - asyncio で非同期 I/O
-   - worker_threads で並列処理数制御
-
-3. **メモリ管理**
+2. **メモリ管理**
    - 大量ログファイル対策: ストリーミング読み込み
    - max_log_lines でメモリ使用量制限
 
-4. **ディスク I/O**
+3. **ディスク I/O**
    - SQLite WAL モード有効化（並行読み書き）
    - バッチコミット（トランザクション最適化）
 
