@@ -1,6 +1,5 @@
 """ログファイル監視機能のユニットテスト"""
 
-import asyncio
 import time
 from pathlib import Path
 from unittest.mock import Mock
@@ -96,8 +95,7 @@ def test_watcher_invalid_directory(callback_mock: Mock) -> None:
 
 
 @pytest.mark.unit
-@pytest.mark.asyncio
-async def test_watcher_file_detection(temp_log_dir: Path, callback_mock: Mock) -> None:
+def test_watcher_file_detection(temp_log_dir: Path, callback_mock: Mock) -> None:
     """ファイルペア検出テスト
 
     Args:
@@ -119,14 +117,14 @@ async def test_watcher_file_detection(temp_log_dir: Path, callback_mock: Mock) -
         txt_file.write_text("test log content")
 
         # 少し待機
-        await asyncio.sleep(0.2)
+        time.sleep(0.2)
 
         # JSONファイルを作成（トリガー）
         json_file = temp_log_dir / "2025-10-18_120000.000.json"
         json_file.write_text('{"test": "data"}')
 
         # コールバックが呼ばれるまで待機
-        await asyncio.sleep(1.0)
+        time.sleep(1.0)
 
         # コールバックが呼ばれたことを確認
         callback_mock.assert_called_once()
@@ -139,8 +137,7 @@ async def test_watcher_file_detection(temp_log_dir: Path, callback_mock: Mock) -
 
 
 @pytest.mark.unit
-@pytest.mark.asyncio
-async def test_watcher_txt_delayed(temp_log_dir: Path, callback_mock: Mock) -> None:
+def test_watcher_txt_delayed(temp_log_dir: Path, callback_mock: Mock) -> None:
     """TXTファイル遅延作成テスト
 
     Args:
@@ -162,12 +159,12 @@ async def test_watcher_txt_delayed(temp_log_dir: Path, callback_mock: Mock) -> N
         json_file.write_text('{"test": "data"}')
 
         # 少し待機してからTXTファイルを作成
-        await asyncio.sleep(0.5)
+        time.sleep(0.5)
         txt_file = temp_log_dir / "2025-10-18_120001.000.txt"
         txt_file.write_text("test log content")
 
         # コールバックが呼ばれるまで待機
-        await asyncio.sleep(1.0)
+        time.sleep(1.0)
 
         # コールバックが呼ばれたことを確認
         callback_mock.assert_called_once()
@@ -180,8 +177,7 @@ async def test_watcher_txt_delayed(temp_log_dir: Path, callback_mock: Mock) -> N
 
 
 @pytest.mark.unit
-@pytest.mark.asyncio
-async def test_watcher_txt_timeout(temp_log_dir: Path, callback_mock: Mock) -> None:
+def test_watcher_txt_timeout(temp_log_dir: Path, callback_mock: Mock) -> None:
     """TXTファイルタイムアウトテスト
 
     Args:
@@ -203,7 +199,7 @@ async def test_watcher_txt_timeout(temp_log_dir: Path, callback_mock: Mock) -> N
         json_file.write_text('{"test": "data"}')
 
         # タイムアウトより長く待機
-        await asyncio.sleep(2.0)
+        time.sleep(2.0)
 
         # コールバックが呼ばれていないことを確認
         callback_mock.assert_not_called()
@@ -213,8 +209,7 @@ async def test_watcher_txt_timeout(temp_log_dir: Path, callback_mock: Mock) -> N
 
 
 @pytest.mark.unit
-@pytest.mark.asyncio
-async def test_watcher_ignore_non_json(temp_log_dir: Path, callback_mock: Mock) -> None:
+def test_watcher_ignore_non_json(temp_log_dir: Path, callback_mock: Mock) -> None:
     """JSON以外のファイルを無視するテスト
 
     Args:
@@ -234,7 +229,7 @@ async def test_watcher_ignore_non_json(temp_log_dir: Path, callback_mock: Mock) 
         txt_file.write_text("test log content")
 
         # 少し待機
-        await asyncio.sleep(1.0)
+        time.sleep(1.0)
 
         # コールバックが呼ばれていないことを確認
         callback_mock.assert_not_called()

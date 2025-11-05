@@ -4,8 +4,9 @@ watchdogライブラリを使用してAmatsukazeログファイルを監視し�
 新しいログファイルペア（txt + json）を検出する
 """
 
-import asyncio
 import logging
+import threading
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -38,7 +39,7 @@ class LogFileHandler(FileSystemEventHandler):
         self.callback = callback
         self.txt_wait_timeout = txt_wait_timeout
         self.polling_interval = polling_interval
-        self._pending_tasks: dict[str, asyncio.Task] = {}
+        self._pending_tasks: dict[str, threading.Thread] = {}
 
     def on_created(self, event: FileCreatedEvent) -> None:
         """ファイル作成イベントハンドラ
@@ -57,17 +58,22 @@ class LogFileHandler(FileSystemEventHandler):
 
         logger.info(f"JSONファイル検出: {file_path}")
 
-        # 対応するTXTファイルを非同期で待機
+        # 対応するTXTファイルを別スレッドで待機
         task_id = file_path.stem
         if task_id in self._pending_tasks:
             logger.warning(f"既に処理中のタスク: {task_id}")
             return
 
-        # 非同期タスクを作成
-        task = asyncio.create_task(self._wait_for_txt_file(file_path))
-        self._pending_tasks[task_id] = task
+        # スレッドを作成して待機処理を開始
+        thread = threading.Thread(
+            target=self._wait_for_txt_file,
+            args=(file_path,),
+            daemon=True,
+        )
+        thread.start()
+        self._pending_tasks[task_id] = thread
 
-    async def _wait_for_txt_file(self, json_path: Path) -> None:
+    def _wait_for_txt_file(self, json_path: Path) -> None:
         """対応するTXTファイルを待機
 
         Args:
@@ -91,7 +97,7 @@ class LogFileHandler(FileSystemEventHandler):
                         logger.error(f"コールバック実行エラー: {e}", exc_info=True)
                     break
 
-                await asyncio.sleep(self.polling_interval)
+                time.sleep(self.polling_interval)
                 elapsed += self.polling_interval
             else:
                 # タイムアウト
