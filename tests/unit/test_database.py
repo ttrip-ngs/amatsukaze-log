@@ -1,6 +1,5 @@
 """送信済みログ管理データベースのユニットテスト"""
 
-import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -43,18 +42,20 @@ class TestLogDatabase:
             result = db.is_processed("2025-10-18_120000.000")
             assert result is False
 
-    def test_mark_as_sent(self, temp_db: Path) -> None:
-        """送信済み記録テスト"""
+    def test_mark_as_processed(self, temp_db: Path) -> None:
+        """処理済み記録テスト"""
         with LogDatabase(temp_db) as db:
             task_id = "2025-10-18_120000.000"
             file_path = "/test/path/2025-10-18_120000.000.json"
+            vector_file = "/var/log/vector/amatsukaze-20251018.jsonl"
+            syslog_file = "/var/log/syslog/amatsukaze-critical-20251018.log"
 
-            # 送信記録
-            db.mark_as_sent(
+            # 処理済み記録
+            db.mark_as_processed(
                 task_id=task_id,
                 file_path=file_path,
-                vector_sent=True,
-                syslog_sent=False,
+                vector_file=vector_file,
+                syslog_file=syslog_file,
             )
 
             # 記録確認
@@ -63,164 +64,57 @@ class TestLogDatabase:
             # データ内容確認
             cursor = db.conn.cursor()
             cursor.execute(
-                "SELECT file_path, vector_sent, syslog_sent FROM processed_logs WHERE task_id = ?",
+                "SELECT file_path, vector_file, syslog_file FROM processed_logs WHERE task_id = ?",
                 (task_id,),
             )
             row = cursor.fetchone()
             assert row is not None
             assert row["file_path"] == file_path
-            assert row["vector_sent"] == 1
-            assert row["syslog_sent"] == 0
+            assert row["vector_file"] == vector_file
+            assert row["syslog_file"] == syslog_file
 
-    def test_mark_as_sent_update(self, temp_db: Path) -> None:
-        """送信済み更新テスト（ON CONFLICT UPDATE）"""
+    def test_mark_as_processed_update(self, temp_db: Path) -> None:
+        """処理済み更新テスト（ON CONFLICT UPDATE）"""
         with LogDatabase(temp_db) as db:
             task_id = "2025-10-18_120000.000"
             file_path = "/test/path/2025-10-18_120000.000.json"
 
-            # 1回目: Vector送信のみ
-            db.mark_as_sent(
+            # 1回目: Vectorのみ
+            db.mark_as_processed(
                 task_id=task_id,
                 file_path=file_path,
-                vector_sent=True,
-                syslog_sent=False,
+                vector_file="/var/log/vector/file1.jsonl",
+                syslog_file=None,
             )
 
-            # 2回目: Syslog送信も成功
-            db.mark_as_sent(
+            # 2回目: Syslogも追加
+            db.mark_as_processed(
                 task_id=task_id,
                 file_path=file_path,
-                vector_sent=True,
-                syslog_sent=True,
+                vector_file="/var/log/vector/file1.jsonl",
+                syslog_file="/var/log/syslog/file1.log",
             )
 
             # データ内容確認
             cursor = db.conn.cursor()
             cursor.execute(
-                "SELECT vector_sent, syslog_sent FROM processed_logs WHERE task_id = ?",
+                "SELECT vector_file, syslog_file FROM processed_logs WHERE task_id = ?",
                 (task_id,),
             )
             row = cursor.fetchone()
             assert row is not None
-            assert row["vector_sent"] == 1
-            assert row["syslog_sent"] == 1
-
-    def test_increment_retry(self, temp_db: Path) -> None:
-        """リトライ回数インクリメントテスト"""
-        with LogDatabase(temp_db) as db:
-            task_id = "2025-10-18_120000.000"
-            file_path = "/test/path/2025-10-18_120000.000.json"
-
-            # 初回記録
-            db.mark_as_sent(
-                task_id=task_id,
-                file_path=file_path,
-                vector_sent=False,
-                syslog_sent=False,
-            )
-
-            # リトライ1回目
-            retry_count = db.increment_retry(task_id, "Connection timeout")
-            assert retry_count == 1
-
-            # リトライ2回目
-            retry_count = db.increment_retry(task_id, "Connection refused")
-            assert retry_count == 2
-
-            # エラーメッセージ確認
-            cursor = db.conn.cursor()
-            cursor.execute(
-                "SELECT retry_count, last_error FROM processed_logs WHERE task_id = ?",
-                (task_id,),
-            )
-            row = cursor.fetchone()
-            assert row is not None
-            assert row["retry_count"] == 2
-            assert row["last_error"] == "Connection refused"
-
-    def test_get_retry_count(self, temp_db: Path) -> None:
-        """リトライ回数取得テスト"""
-        with LogDatabase(temp_db) as db:
-            task_id = "2025-10-18_120000.000"
-            file_path = "/test/path/2025-10-18_120000.000.json"
-
-            # 未記録の場合
-            assert db.get_retry_count(task_id) == 0
-
-            # 記録後
-            db.mark_as_sent(
-                task_id=task_id,
-                file_path=file_path,
-                vector_sent=False,
-                syslog_sent=False,
-            )
-            assert db.get_retry_count(task_id) == 0
-
-            # リトライ後
-            db.increment_retry(task_id, "Error")
-            assert db.get_retry_count(task_id) == 1
-
-    def test_get_failed_logs(self, temp_db: Path) -> None:
-        """失敗ログ取得テスト"""
-        with LogDatabase(temp_db) as db:
-            # 成功ケース（取得対象外）
-            db.mark_as_sent(
-                task_id="success_1",
-                file_path="/test/success_1.json",
-                vector_sent=True,
-                syslog_sent=True,
-            )
-
-            # 失敗ケース1: Vector失敗
-            db.mark_as_sent(
-                task_id="failed_1",
-                file_path="/test/failed_1.json",
-                vector_sent=False,
-                syslog_sent=True,
-            )
-            db.increment_retry("failed_1", "Vector error")
-
-            # 失敗ケース2: Syslog失敗
-            db.mark_as_sent(
-                task_id="failed_2",
-                file_path="/test/failed_2.json",
-                vector_sent=True,
-                syslog_sent=False,
-            )
-            db.increment_retry("failed_2", "Syslog error")
-
-            # リトライ上限超過ケース（取得対象外）
-            db.mark_as_sent(
-                task_id="retry_exceeded",
-                file_path="/test/retry_exceeded.json",
-                vector_sent=False,
-                syslog_sent=False,
-            )
-            for _ in range(6):
-                db.increment_retry("retry_exceeded", "Max retry exceeded")
-
-            # 失敗ログ取得（max_retry=5）
-            failed_logs = db.get_failed_logs(max_retry=5)
-
-            # 2件取得される
-            assert len(failed_logs) == 2
-
-            task_ids = {log["task_id"] for log in failed_logs}
-            assert "failed_1" in task_ids
-            assert "failed_2" in task_ids
-            assert "success_1" not in task_ids
-            assert "retry_exceeded" not in task_ids
+            assert row["vector_file"] == "/var/log/vector/file1.jsonl"
+            assert row["syslog_file"] == "/var/log/syslog/file1.log"
 
     def test_cleanup_old_records(self, temp_db: Path) -> None:
         """古いレコード削除テスト"""
         with LogDatabase(temp_db) as db:
             # 古いレコード（31日前）
             old_task_id = "old_task"
-            db.mark_as_sent(
+            db.mark_as_processed(
                 task_id=old_task_id,
                 file_path="/test/old.json",
-                vector_sent=True,
-                syslog_sent=True,
+                vector_file="/var/log/vector/old.jsonl",
             )
 
             # processed_atを手動で古い日付に変更
@@ -234,11 +128,10 @@ class TestLogDatabase:
 
             # 新しいレコード（今日）
             new_task_id = "new_task"
-            db.mark_as_sent(
+            db.mark_as_processed(
                 task_id=new_task_id,
                 file_path="/test/new.json",
-                vector_sent=True,
-                syslog_sent=True,
+                vector_file="/var/log/vector/new.jsonl",
             )
 
             # クリーンアップ実行（30日保持）
@@ -257,11 +150,10 @@ class TestLogDatabase:
         """コンテキストマネージャーテスト"""
         # withブロック内でDB操作
         with LogDatabase(temp_db) as db:
-            db.mark_as_sent(
+            db.mark_as_processed(
                 task_id="test_task",
                 file_path="/test/test.json",
-                vector_sent=True,
-                syslog_sent=True,
+                vector_file="/var/log/vector/test.jsonl",
             )
             assert db.conn is not None
 
@@ -279,46 +171,6 @@ class TestLogDatabase:
         # 2回クローズしてもエラーにならない
         db.close()
 
-    def test_multiple_operations(self, temp_db: Path) -> None:
-        """複数操作の統合テスト"""
-        with LogDatabase(temp_db) as db:
-            task_id = "2025-10-18_120000.000"
-            file_path = "/test/path/2025-10-18_120000.000.json"
-
-            # 1. 未処理確認
-            assert db.is_processed(task_id) is False
-
-            # 2. 送信記録（Vector失敗）
-            db.mark_as_sent(
-                task_id=task_id,
-                file_path=file_path,
-                vector_sent=False,
-                syslog_sent=True,
-            )
-            assert db.is_processed(task_id) is True
-            assert db.get_retry_count(task_id) == 0
-
-            # 3. リトライ
-            db.increment_retry(task_id, "Vector timeout")
-            assert db.get_retry_count(task_id) == 1
-
-            # 4. 失敗ログ取得
-            failed_logs = db.get_failed_logs()
-            assert len(failed_logs) == 1
-            assert failed_logs[0]["task_id"] == task_id
-
-            # 5. リトライ成功、送信記録更新
-            db.mark_as_sent(
-                task_id=task_id,
-                file_path=file_path,
-                vector_sent=True,
-                syslog_sent=True,
-            )
-
-            # 6. 失敗ログから除外
-            failed_logs = db.get_failed_logs()
-            assert len(failed_logs) == 0
-
     def test_db_error_handling(self, temp_db: Path) -> None:
         """データベースエラーハンドリングテスト"""
         db = LogDatabase(temp_db)
@@ -331,16 +183,7 @@ class TestLogDatabase:
             db.is_processed("test")
 
         with pytest.raises(RuntimeError, match="データベース未初期化"):
-            db.mark_as_sent("test", "/test", True, True)
-
-        with pytest.raises(RuntimeError, match="データベース未初期化"):
-            db.increment_retry("test", "error")
-
-        with pytest.raises(RuntimeError, match="データベース未初期化"):
-            db.get_retry_count("test")
-
-        with pytest.raises(RuntimeError, match="データベース未初期化"):
-            db.get_failed_logs()
+            db.mark_as_processed("test", "/test", "/var/log/vector/test.jsonl")
 
         with pytest.raises(RuntimeError, match="データベース未初期化"):
             db.cleanup_old_records()
