@@ -22,39 +22,37 @@ class WatcherConfig(BaseModel):
     polling_interval: int = Field(default=5, description="ポーリング間隔（秒）")
 
 
-class VectorConfig(BaseModel):
-    """Vector送信設定"""
+class VectorWriterConfig(BaseModel):
+    """Vector用ログファイル出力設定"""
 
-    enabled: bool = Field(default=True, description="Vector送信有効化")
-    endpoint: str = Field(
-        default="http://vector:9000/amatsukaze", description="VectorエンドポイントURL"
+    enabled: bool = Field(default=True, description="Vector用ログファイル出力有効化")
+    log_directory: Path = Field(
+        default=Path("/data/logs/vector"), description="ログファイル出力ディレクトリ"
     )
-    timeout: int = Field(default=10, description="タイムアウト（秒）")
-    retry_max: int = Field(default=5, description="最大リトライ回数")
-    retry_backoff_base: int = Field(default=2, description="リトライバックオフ係数")
+    rotate_size: int = Field(default=104857600, description="ローテーションサイズ（バイト）")
 
 
-class SyslogConfig(BaseModel):
-    """rsyslogd送信設定"""
+class SyslogWriterConfig(BaseModel):
+    """rsyslogd用ログファイル出力設定"""
 
-    enabled: bool = Field(default=True, description="syslog送信有効化")
-    host: str = Field(default="rsyslogd", description="rsyslogdホスト")
-    port: int = Field(default=514, description="syslogポート")
-    protocol: Literal["udp", "tcp"] = Field(default="udp", description="プロトコル")
-    facility: str = Field(default="user", description="syslog facility")
+    enabled: bool = Field(default=True, description="syslog用ログファイル出力有効化")
+    log_directory: Path = Field(
+        default=Path("/data/logs/syslog"), description="ログファイル出力ディレクトリ"
+    )
+    rotate_size: int = Field(default=104857600, description="ローテーションサイズ（バイト）")
 
 
 class DatabaseConfig(BaseModel):
-    """送信済み管理DB設定"""
+    """処理済みログ管理DB設定"""
 
     path: Path = Field(default=Path("/data/processed_logs.db"), description="DBファイルパス")
 
 
-class SenderConfig(BaseModel):
-    """ログ送信設定"""
+class WriterConfig(BaseModel):
+    """ログ書き込み設定"""
 
-    vector: VectorConfig = Field(default_factory=VectorConfig)
-    syslog: SyslogConfig = Field(default_factory=SyslogConfig)
+    vector: VectorWriterConfig = Field(default_factory=VectorWriterConfig)
+    syslog: SyslogWriterConfig = Field(default_factory=SyslogWriterConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
 
 
@@ -104,7 +102,7 @@ class Config(BaseSettings):
     """
 
     watcher: WatcherConfig = Field(default_factory=WatcherConfig)
-    sender: SenderConfig = Field(default_factory=SenderConfig)
+    writer: WriterConfig = Field(default_factory=WriterConfig)
     parser: ParserConfig = Field(default_factory=ParserConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     app: AppConfig = Field(default_factory=AppConfig)
@@ -151,6 +149,12 @@ class Config(BaseSettings):
                 f"ログディレクトリが存在しません: {self.watcher.log_directory}"
             )
 
+        # 出力ディレクトリの作成
+        if self.writer.vector.enabled:
+            self.writer.vector.log_directory.mkdir(parents=True, exist_ok=True)
+        if self.writer.syslog.enabled:
+            self.writer.syslog.log_directory.mkdir(parents=True, exist_ok=True)
+
         # DBディレクトリの作成
-        db_dir = self.sender.database.path.parent
+        db_dir = self.writer.database.path.parent
         db_dir.mkdir(parents=True, exist_ok=True)

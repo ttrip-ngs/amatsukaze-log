@@ -2,11 +2,14 @@
 
 ## 現在のステータス
 
-Phase 2: コア機能実装中
+Phase 2: コア機能実装完了
 - Phase 1: プロジェクトセットアップ完了
 - Phase 2.1: データモデル実装完了
 - Phase 2.2: ログパーサー実装完了（YAMLベースのカスタムルールシステム含む）
-- 次: Phase 2.3 ログ監視機能実装
+- Phase 2.3: ログ監視機能実装完了
+- Phase 2.4: ログ書き込み機能実装完了（ファイルベース方式）
+- Phase 2.5: メインアプリケーション実装完了
+- 次: Phase 3 テスト拡充、Phase 4 Docker環境構築
 
 ## タスク一覧
 
@@ -69,50 +72,45 @@ Phase 2: コア機能実装中
   - [x] ドット記法サポート (audiodiff.maxdiff等)
   - [x] 複雑な論理式サポート (括弧、not演算子)
 
-#### 2.3 ログ監視機能実装
+#### 2.3 ログ監視機能実装 ✅
 
-- [ ] ファイル監視 (collector/watcher.py)
-  - [ ] inotify (watchdog) セットアップ
-  - [ ] JSONファイル作成検知
-  - [ ] 対応TXTファイル待機
-  - [ ] ファイルペア関連付け
-  - [ ] 処理キュー管理
+- [x] ファイル監視 (collector/watcher.py)
+  - [x] inotify (watchdog) セットアップ
+  - [x] JSONファイル作成検知
+  - [x] 対応TXTファイル待機
+  - [x] ファイルペア関連付け
+  - [x] 処理キュー管理（スレッドベース）
 
-#### 2.4 ログ送信機能実装
+#### 2.4 ログ書き込み機能実装 ✅
 
-- [ ] Vector送信 (collector/sender.py)
-  - [ ] HTTP POST 実装
-  - [ ] JSON シリアライズ
-  - [ ] タイムアウト処理
-  - [ ] エラーハンドリング
+- [x] ファイルベース方式に変更（HTTP送信からの変更）
+  - [x] Vector用ログファイル書き込み (collector/writer.py)
+    - [x] JSON Lines形式でファイル出力
+    - [x] ローテーション機能
+  - [x] rsyslogd用ログファイル書き込み (collector/writer.py)
+    - [x] syslog形式でファイル出力
+    - [x] CRITICALログのみ出力
+    - [x] RFC 3164形式対応
+  - [x] 統合ライター (collector/writer.py)
+    - [x] Vector/Syslog両方への書き込み統合
 
-- [ ] rsyslogd送信 (collector/sender.py)
-  - [ ] syslog プロトコル実装
-  - [ ] facility/severity マッピング
-  - [ ] CRITICAL判定ロジック
-  - [ ] メッセージフォーマット
+- [x] 処理済みログ管理 (collector/database.py)
+  - [x] SQLite DB初期化
+  - [x] 処理済み記録
+  - [x] 重複チェック
+  - [x] ファイルパストラッキング
 
-- [ ] 送信済み管理 (collector/database.py)
-  - [ ] SQLite DB初期化
-  - [ ] 送信済み記録
-  - [ ] 重複チェック
-  - [ ] リトライ管理
+#### 2.5 メインアプリケーション ✅
 
-- [ ] リトライロジック (collector/sender.py)
-  - [ ] exponential backoff 実装
-  - [ ] 最大リトライ回数制御
-  - [ ] 失敗ログ記録
+- [x] アプリケーションエントリーポイント (src/main.py)
+  - [x] 設定読み込み (YAML)
+  - [x] ロギングセットアップ (JSON/テキスト形式)
+  - [x] 各コンポーネント初期化
+  - [x] メインループ実装
+  - [x] シグナルハンドリング (SIGTERM/SIGINT)
+  - [x] パス検証とディレクトリ自動作成
 
-#### 2.5 メインアプリケーション
-
-- [ ] アプリケーションエントリーポイント (main.py)
-  - [ ] 設定読み込み
-  - [ ] ロギングセットアップ
-  - [ ] 各コンポーネント初期化
-  - [ ] メインループ実装
-  - [ ] シグナルハンドリング (SIGTERM/SIGINT)
-
-- [ ] ヘルスチェックエンドポイント
+- [ ] ヘルスチェックエンドポイント（オプション機能）
   - [ ] HTTP サーバー起動
   - [ ] /health エンドポイント実装
   - [ ] メトリクス収集
@@ -228,15 +226,21 @@ Phase 2: コア機能実装中
 - [x] docs/architecture.md 作成
 - [x] TASKS.md 作成（本ファイル）
 - [x] Phase 1: プロジェクトセットアップ完了
-- [x] Phase 2.1: データモデル実装完了
-- [x] Phase 2.2: ログパーサー実装完了
-  - [x] YAMLベースのカスタムCRITICALルールシステム実装
-  - [x] simpleeval導入で安全性向上
-  - [x] Python 3.12+対応、全ライブラリ最新化
+- [x] Phase 2: コア機能実装完了
+  - [x] Phase 2.1: データモデル実装完了
+  - [x] Phase 2.2: ログパーサー実装完了
+    - [x] YAMLベースのカスタムCRITICALルールシステム実装
+    - [x] simpleeval導入で安全性向上
+    - [x] Python 3.12+対応、全ライブラリ最新化
+  - [x] Phase 2.3: ログ監視機能実装完了（watchdog）
+  - [x] Phase 2.4: ログ書き込み機能実装完了（ファイルベース方式）
+  - [x] Phase 2.5: メインアプリケーション実装完了
 
 ## 次のアクション
 
-Phase 2.3: ログ監視機能実装（watchdogによるファイル監視）
+Phase 3: テスト拡充、またはPhase 4: Docker環境構築
+
+推奨: Phase 4を優先（実環境で動作確認してからテストを拡充）
 
 ## 備考
 
