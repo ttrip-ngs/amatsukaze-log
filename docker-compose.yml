@@ -1,11 +1,11 @@
-# Amatsukaze Log Collector - 開発環境
+# Amatsukaze Log Collector - 本番環境
 #
 # 外部のLoki/Grafanaサーバーを使用する構成
 #
 # 使用方法:
 #   # 環境変数で外部Lokiを指定
 #   export LOKI_ENDPOINT=http://your-loki-server:3100
-#   docker compose -f docker-compose.dev.yml up -d
+#   docker compose up -d
 #
 # サービス構成:
 #   - collector: ログ収集・パース・ファイル出力
@@ -19,17 +19,16 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: amatsukaze-collector
+    restart: unless-stopped
     volumes:
-      # ソースコードをマウント（ホットリロード）
-      - ./src:/app/src
-      - ./config:/app/config
-      - ./tests:/app/tests
-      # サンプルログをマウント
-      - ./tmp/sample_log:/var/log/amatsukaze:ro
-      # 送信済みDB永続化（Vectorと共有）
+      # 設定ファイル
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      # Amatsukazeログディレクトリ（ホストのパスに変更してください）
+      - /path/to/amatsukaze/logs:/var/log/amatsukaze:ro
+      # 処理済みDB永続化
       - collector-data:/data
     environment:
-      - LOG_LEVEL=DEBUG
+      - LOG_LEVEL=INFO
       - CONFIG_PATH=/app/config/config.yaml
     depends_on:
       - vector
@@ -42,12 +41,13 @@ services:
   rsyslogd:
     image: rsyslog/syslog_appliance_alpine:latest
     container_name: amatsukaze-rsyslog
+    restart: unless-stopped
     ports:
       - "514:514/udp"
       - "514:514/tcp"
     volumes:
       - ./config/rsyslog.conf:/etc/rsyslog.conf:ro
-      - collector-data:/data:ro  # collectorが書き込んだsyslogファイルを読み取り
+      - collector-data:/data:ro
       - rsyslog-logs:/var/log
     networks:
       - amatsukaze-net
@@ -56,11 +56,12 @@ services:
   vector:
     image: timberio/vector:latest-alpine
     container_name: amatsukaze-vector
+    restart: unless-stopped
     ports:
       - "9000:9000"  # API endpoint
     volumes:
       - ./config/vector.toml:/etc/vector/vector.toml:ro
-      - collector-data:/data:ro  # collectorが書き込んだログを読み取り
+      - collector-data:/data:ro
     environment:
       # 外部Lokiエンドポイント（環境変数で設定）
       - LOKI_ENDPOINT=${LOKI_ENDPOINT:-http://loki:3100}
@@ -71,7 +72,9 @@ services:
 
 volumes:
   collector-data:
+    driver: local
   rsyslog-logs:
+    driver: local
 
 networks:
   amatsukaze-net:

@@ -4,7 +4,7 @@
 
 ## プロジェクト概要
 
-Amatsukazeエンコーダのログを収集し、Loki/Grafanaで可視化、Zabbixでアラート管理を行うシステム。
+Amatsukazeエンコーダのログを収集し、外部Loki/Grafanaで可視化、Zabbixでアラート管理を行うシステム。
 現在、Windowsクライアントでしか確認できないエンコード状況をWebベースで監視可能にする。
 
 ## システム構成
@@ -24,19 +24,24 @@ Amatsukazeエンコーダのログを収集し、Loki/Grafanaで可視化、Zabb
 ```
 Amatsukazeログ(txt/json)
     ↓
-[ログ収集コンテナ (Python)] ← Docker
-    ↓
-    ├─→ Vector (HTTP/TCP, JSON + Labels) ← 全ログ詳細データ
+[ログ収集コンテナ (Python)]  ← Docker (collector)
+    ↓ ファイル出力
+    ├─→ JSONLファイル (/data/logs/vector/)
     │     ↓
-    │   Vector (transform/routing)
+    │   [Vector (ローカル)]  ← Docker (vector)
+    │     ↓ 外部送信
+    │   ┌─────────────────────────────────┐
+    │   │ 選択肢1: 外部Loki (直接送信)     │
+    │   │ 選択肢2: 外部Vector (Vector経由) │
+    │   └─────────────────────────────────┘
     │     ↓
-    │   Loki (保存)
+    │   Loki (外部サーバー)
     │     ↓
-    │   Grafana (可視化)
+    │   Grafana (外部サーバー)
     │
-    └─→ rsyslogd (syslog) ← CRITICALアラートのみ
+    └─→ syslogファイル (/data/logs/syslog/)  ← CRITICALのみ
           ↓
-        Vector
+        [rsyslogd (ローカル)]  ← Docker (rsyslogd)
           ↓
         Zabbix (アラート)
 ```
@@ -45,9 +50,27 @@ Amatsukazeログ(txt/json)
 
 - 言語: Python 3.11+
 - コンテナ: Docker
-- ログ転送: rsyslogd → Vector → Loki/Zabbix
-- 可視化: Grafana
-- 監視: Zabbix
+- ログ転送: collector → ファイル → Vector → 外部Loki/Vector
+- 可視化: Grafana（外部サーバー）
+- 監視: Zabbix（外部サーバー）
+
+## Docker構成
+
+### サービス一覧
+| サービス | イメージ | 役割 |
+|---------|---------|------|
+| collector | 自前ビルド | ログ収集・パース・ファイル出力 |
+| vector | timberio/vector:latest-alpine | ログファイル読み取り → 外部送信 |
+| rsyslogd | rsyslog/syslog_appliance_alpine:latest | CRITICALログ → Zabbix連携 |
+
+### 環境変数
+```bash
+# 外部Lokiエンドポイント
+LOKI_ENDPOINT=http://your-loki-server:3100
+
+# 外部Vectorエンドポイント（Vector経由の場合）
+VECTOR_ENDPOINT=your-vector-server:9000
+```
 
 ## ログファイル構造
 
@@ -83,8 +106,7 @@ Amatsukazeログ(txt/json)
   "error": {
     "unknown-pts": 0,
     "decode-packet-failed": 0,
-    "h264-pts-mismatch": 0,
-    ...
+    "h264-pts-mismatch": 0
   },
   "cmanalyze": true
 }
@@ -100,12 +122,11 @@ Amatsukazeログ(txt/json)
 
 ## 送信データ形式
 
-### Vector/Loki用（JSON + Labels）
+### Vector/Loki用（JSON Lines）
 ```json
 {
   "timestamp": "2025-10-18T01:54:20.932Z",
   "message": "エンコード完了: [新]緊急取調室 #1",
-
   "labels": {
     "service": "amatsukaze",
     "environment": "production",
@@ -114,7 +135,6 @@ Amatsukazeログ(txt/json)
     "severity": "info",
     "encoder": "QSVEnc"
   },
-
   "task_id": "2025-10-18_015420.932",
   "program_name": "[新]緊急取調室 #1[解][字]",
   "src_path": "/REC_01/TV-Record/...",
@@ -136,32 +156,31 @@ Grafanaでのクエリ例:
 {service="amatsukaze", encoder="QSVEnc"} |= "エンコード失敗"
 ```
 
-### Zabbix用（syslog）
+### Zabbix用（syslog RFC 3164）
 ```
-<Priority>timestamp hostname amatsukaze: CRITICAL: [番組名] - エンコード失敗: エラーメッセージ
+<11>Oct 18 01:54:20 encoder-01 amatsukaze: CRITICAL: [番組名] - エンコード失敗: エラーメッセージ
 ```
 
 ## 実装方針
 
-### ログ送信方式（ハイブリッド）
-- 全ログ: VectorにJSON直接送信（構造化データ保持）
-- CRITICALアラート: rsyslogdにsyslog送信（既存監視と統合）
+### ログ送信方式（ファイルベース）
+- 全ログ: JSONLファイル出力 → Vector読み取り → 外部Loki/Vector送信
+- CRITICALアラート: syslogファイル出力 → rsyslogd → Zabbix
 
 ### 処理タイミング
-- ログファイル監視（inotify使用）
+- ログファイル監視（watchdog/inotify使用）
 - JSONファイル作成検知で処理開始
 - 対応するTXTファイルとペアで解析
 - 数分程度の遅延は許容
 
 ### エラーハンドリング
-- rsyslogd/Vector接続失敗: リトライ後、ログ記録
 - パース失敗: エラーログ記録し、スキップ
-- 重複送信防止: 送信済み管理機構を実装
+- 重複送信防止: SQLiteで送信済み管理
 
 ## 運用要件
 
 ### ログファイル
-- 保持: 元のtxt/jsonファイルは送信後も保持（Amatsukazeに削除オプションあり）
+- 保持: 元のtxt/jsonファイルは送信後も保持
 - ディレクトリ: 任意パス指定可能（設定ファイルで指定）
 
 ### コンテナ実行
@@ -170,13 +189,13 @@ Grafanaでのクエリ例:
 - 設定ファイルで柔軟に設定変更可能
 
 ### 遅延要件
-- リアルタイム性は不要
+- リアルタイム性は不要（5-30秒間隔で十分）
 - 数分程度の遅延は許容
 
-## Grafanaダッシュボード要件（将来）
+## Grafanaダッシュボード要件
 
 ### 表示項目
-1. エンコードタスク一覧
+1. エンコードタスク一覧（10-50件表示）
    - 日時、番組名、ステータス、処理時間、圧縮率
 2. エラー詳細
    - エラー種別別集計、失敗タスクの詳細
@@ -196,15 +215,16 @@ Grafanaでのクエリ例:
 - すべての開発はDockerコンテナ内で実行
   - ローカルホストへの直接インストール不要
   - docker-compose.dev.yml で開発環境一式構築
-  - ログサーバ（rsyslogd/Vector/Loki）も含めた統合開発環境
 
-## 次のステップ
+## クイックスタート
 
-1. 詳細設計ドキュメント作成
-2. タスク整理（TASKS.md）
-3. プロジェクト構造作成
-4. ログパーサー実装
-5. ログ収集・送信機能実装
-6. Docker環境構築
-7. テスト実装
-8. Grafanaダッシュボード雛形作成
+```bash
+# 環境変数設定
+export LOKI_ENDPOINT=http://your-loki-server:3100
+
+# 開発環境起動
+docker compose -f docker-compose.dev.yml up -d
+
+# ログ確認
+docker compose -f docker-compose.dev.yml logs -f collector
+```

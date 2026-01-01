@@ -1,0 +1,138 @@
+# Vector Configuration for Amatsukaze Log Collector
+#
+# ファイルベース方式:
+#   collector → ログファイル書き込み → Vector読み取り → 外部送信
+#
+# 送信先オプション（環境に応じて選択）:
+#   1. loki_external   - 外部Loki（直接送信）
+#   2. vector_external - 外部Vector（Vector経由）
+#
+# データパイプライン:
+#   [file source] → [parse JSON] → [add labels] → [sink]
+
+# ========================================
+# Data Directory
+# ========================================
+data_dir = "/var/lib/vector"
+
+# ========================================
+# Sources
+# ========================================
+
+# collectorが書き込んだJSON Linesログファイルを読み取り
+[sources.amatsukaze_logs]
+type = "file"
+include = ["/data/logs/vector/amatsukaze*.jsonl"]
+read_from = "beginning"  # 初回は最初から、以降は続きから読み取り
+fingerprint.strategy = "device_and_inode"
+ignore_older_secs = 86400  # 24時間以上古いファイルは無視
+
+# ========================================
+# Transforms
+# ========================================
+
+# JSON Linesパース
+[transforms.parse_json]
+type = "remap"
+inputs = ["amatsukaze_logs"]
+source = '''
+# JSON文字列をパース
+. = parse_json!(.message)
+
+# タイムスタンプを正規化（ISO 8601形式）
+if exists(.timestamp) {
+  .timestamp = parse_timestamp!(.timestamp, format: "%+")
+}
+'''
+
+# Lokiラベル抽出（構造化データからラベルを生成）
+[transforms.add_labels]
+type = "remap"
+inputs = ["parse_json"]
+source = '''
+# labelsフィールドが存在する場合、トップレベルに展開
+if exists(.labels) {
+  .service = .labels.service
+  .environment = .labels.environment
+  .host = .labels.host
+  .status = .labels.status
+  .severity = .labels.severity
+  .encoder = .labels.encoder
+
+  # labels自体は削除（Lokiラベルとして使用するため）
+  del(.labels)
+}
+
+# デフォルトラベル設定（labelsフィールドがない場合）
+if !exists(.service) {
+  .service = "amatsukaze"
+}
+if !exists(.environment) {
+  .environment = "production"
+}
+if !exists(.severity) {
+  .severity = "info"
+}
+'''
+
+# ========================================
+# Sinks - 外部Loki（直接送信）
+# ========================================
+# 外部のLokiサーバーに直接送信する場合に使用
+# endpointを環境に合わせて設定してください
+
+[sinks.loki_external]
+type = "loki"
+inputs = ["add_labels"]
+endpoint = "${LOKI_ENDPOINT:-http://loki:3100}"  # 環境変数で設定可能
+encoding.codec = "json"
+
+[sinks.loki_external.labels]
+service = "{{ service }}"
+environment = "{{ environment }}"
+host = "{{ host }}"
+status = "{{ status }}"
+severity = "{{ severity }}"
+encoder = "{{ encoder }}"
+
+[sinks.loki_external.batch]
+max_bytes = 1048576  # 1MB
+timeout_secs = 5
+
+[sinks.loki_external.request]
+retry_attempts = 5
+retry_initial_backoff_secs = 1
+retry_max_duration_secs = 30
+
+# ========================================
+# Sinks - 外部Vector（Vector経由）
+# ========================================
+# 外部のVectorサーバーに送信する場合に使用
+# loki_externalの代わりに使用する場合:
+#   1. 上のloki_externalセクションをコメントアウト
+#   2. 下のvector_externalセクションのコメントを解除
+
+# [sinks.vector_external]
+# type = "vector"
+# inputs = ["add_labels"]
+# address = "${VECTOR_ENDPOINT:-vector-server:9000}"  # 環境変数で設定可能
+# version = "2"  # Vector protocol version
+#
+# [sinks.vector_external.batch]
+# max_bytes = 1048576
+# timeout_secs = 5
+#
+# [sinks.vector_external.buffer]
+# type = "disk"
+# max_size = 268435488  # 256MB - ネットワーク障害時のバッファ
+# when_full = "block"
+
+# ========================================
+# API Settings
+# ========================================
+
+# ヘルスチェック・メトリクスエンドポイント
+[api]
+enabled = true
+address = "0.0.0.0:9000"
+playground = false

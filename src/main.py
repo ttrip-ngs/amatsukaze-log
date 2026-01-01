@@ -42,23 +42,13 @@ class LogCollectorApp:
         )
 
         # ライター初期化
-        vector_writer = None
-        if config.writer.vector.enabled:
-            vector_writer = LogFileWriter(
-                log_dir=config.writer.vector.log_directory,
-                rotate_size=config.writer.vector.rotate_size,
-            )
-
-        syslog_writer = None
-        if config.writer.syslog.enabled:
-            syslog_writer = SyslogFileWriter(
-                log_dir=config.writer.syslog.log_directory,
-                rotate_size=config.writer.syslog.rotate_size,
-            )
+        vector_log_dir = config.writer.vector.log_directory if config.writer.vector.enabled else None
+        syslog_log_dir = config.writer.syslog.log_directory if config.writer.syslog.enabled else None
 
         self.writer = LogWriter(
-            vector_writer=vector_writer,
-            syslog_writer=syslog_writer,
+            vector_log_dir=vector_log_dir,
+            syslog_log_dir=syslog_log_dir,
+            rotate_size=config.writer.vector.rotate_size,
         )
 
         # ウォッチャー初期化
@@ -190,12 +180,12 @@ def setup_logging(config: Config) -> None:
     if config.logging.format == "json":
         # JSON形式（構造化ログ）
         import json
-        from datetime import datetime
+        from datetime import UTC, datetime
 
         class JsonFormatter(logging.Formatter):
             def format(self, record: logging.LogRecord) -> str:
                 log_data = {
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "level": record.levelname,
                     "logger": record.name,
                     "message": record.getMessage(),
