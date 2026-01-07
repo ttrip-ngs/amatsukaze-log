@@ -18,43 +18,31 @@ watcher:
   # ポーリング間隔（秒）
   polling_interval: 5
 
-# ログ送信設定
-sender:
-  # Vector送信設定
+# ログ書き込み設定
+writer:
+  # Vector用ログファイル出力設定
   vector:
-    # Vector送信の有効化
+    # Vector用ログファイル出力の有効化
     enabled: true
 
-    # VectorエンドポイントURL
-    endpoint: "http://vector:9000/amatsukaze"
+    # ログファイル出力ディレクトリ
+    log_directory: /data/logs/vector
 
-    # タイムアウト（秒）
-    timeout: 10
+    # ローテーションサイズ（バイト）
+    rotate_size: 104857600  # 100MB
 
-    # 最大リトライ回数
-    retry_max: 5
-
-    # リトライバックオフ係数（exponential backoff）
-    retry_backoff_base: 2
-
-  # rsyslogd送信設定
+  # rsyslogd用ログファイル出力設定
   syslog:
-    # syslog送信の有効化（CRITICALエラーのみ）
+    # syslog用ログファイル出力の有効化（CRITICALエラーのみ）
     enabled: true
 
-    # rsyslogdホスト
-    host: rsyslogd
+    # ログファイル出力ディレクトリ
+    log_directory: /data/logs/syslog
 
-    # syslogポート
-    port: 514
+    # ローテーションサイズ（バイト）
+    rotate_size: 104857600  # 100MB
 
-    # プロトコル（udp または tcp）
-    protocol: udp
-
-    # syslog facility
-    facility: user
-
-  # 送信済み管理DB設定
+  # 処理済みログ管理DB設定
   database:
     # DBファイルパス
     path: /data/processed_logs.db
