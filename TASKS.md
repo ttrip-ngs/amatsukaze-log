@@ -2,14 +2,16 @@
 
 ## 現在のステータス
 
-Phase 2: コア機能実装完了
+Phase 3: テスト拡充進行中（75%カバレッジ達成）
 - Phase 1: プロジェクトセットアップ完了
 - Phase 2.1: データモデル実装完了
 - Phase 2.2: ログパーサー実装完了（YAMLベースのカスタムルールシステム含む）
 - Phase 2.3: ログ監視機能実装完了
 - Phase 2.4: ログ書き込み機能実装完了（ファイルベース方式）
 - Phase 2.5: メインアプリケーション実装完了
-- 次: Phase 3 テスト拡充、Phase 4 Docker環境構築
+- Phase 4: Docker環境構築完了（動作確認済み）
+- Phase 3: テスト拡充進行中（55テスト、75%カバレッジ）
+- 次: 統合テスト作成、Phase 5 ドキュメント整備
 
 ## タスク一覧
 
@@ -115,59 +117,67 @@ Phase 2: コア機能実装完了
   - [ ] /health エンドポイント実装
   - [ ] メトリクス収集
 
-### Phase 3: テスト実装
+### Phase 3: テスト実装 (進行中: 75%カバレッジ)
 
-- [ ] ユニットテスト
-  - [ ] test_parser.py
-    - [ ] TXTパーサーテスト
-    - [ ] JSONパーサーテスト
-    - [ ] 統合データ生成テスト
-  - [ ] test_sender.py
-    - [ ] Vector送信テスト (mock)
-    - [ ] syslog送信テスト (mock)
-    - [ ] リトライロジックテスト
-  - [ ] test_database.py
-    - [ ] DB操作テスト
-    - [ ] 重複チェックテスト
+- [x] ユニットテスト
+  - [x] test_parser.py (11テスト)
+    - [x] TXTパーサーテスト
+    - [x] JSONパーサーテスト
+    - [x] 統合データ生成テスト
+    - [x] CRITICALルール対応
+  - [x] test_writer.py (9テスト)
+    - [x] Vector用ファイル出力テスト
+    - [x] Syslog用ファイル出力テスト
+    - [x] ローテーションテスト
+  - [x] test_database.py (8テスト)
+    - [x] DB操作テスト
+    - [x] 重複チェックテスト
+  - [x] test_watcher.py (7テスト)
+    - [x] ファイル監視テスト
+    - [x] タイムアウトテスト
+  - [x] test_condition_evaluator.py (19テスト)
+    - [x] 条件式評価テスト
+    - [x] ドット記法テスト
+  - [x] conftest.py (共通フィクスチャ)
 
 - [ ] 統合テスト
   - [ ] エンドツーエンドテスト
     - [ ] サンプルログファイル使用
     - [ ] 全フロー動作確認
 
-### Phase 4: Docker環境構築
+### Phase 4: Docker環境構築 ✅
 
-- [ ] Dockerfile作成
-  - [ ] Python 3.11+ ベースイメージ
-  - [ ] 依存パッケージインストール
-  - [ ] アプリケーション配置
-  - [ ] エントリーポイント設定
+- [x] Dockerfile作成
+  - [x] Python 3.13-slim ベースイメージ
+  - [x] 依存パッケージインストール
+  - [x] アプリケーション配置
+  - [x] エントリーポイント設定
 
-- [ ] docker-compose.yml作成（本番用）
-  - [ ] amatsukaze-log-collector サービス
-  - [ ] ボリュームマウント設定
-  - [ ] ネットワーク設定
-  - [ ] 環境変数設定
+- [x] docker-compose.yml作成（本番用）
+  - [x] amatsukaze-log-collector サービス
+  - [x] ボリュームマウント設定
+  - [x] ネットワーク設定
+  - [x] 環境変数設定
 
-- [ ] docker-compose.dev.yml作成（開発用）
-  - [ ] collector サービス設定
-  - [ ] rsyslogd サービス追加
-  - [ ] Vector サービス追加
-  - [ ] Loki サービス追加
-  - [ ] Grafana サービス追加
-  - [ ] ホットリロード設定
-  - [ ] デバッグポート公開
-  - [ ] サンプルログマウント
+- [x] docker-compose.dev.yml作成（開発用）
+  - [x] collector サービス設定
+  - [x] rsyslogd サービス追加
+  - [x] Vector サービス追加
+  - [x] ~~Loki サービス追加~~ (外部サーバー使用)
+  - [x] ~~Grafana サービス追加~~ (外部サーバー使用)
+  - [x] ホットリロード設定
+  - [x] デバッグポート公開
+  - [x] サンプルログマウント
 
-- [ ] 設定ファイル作成
-  - [ ] config/rsyslog.conf
-  - [ ] config/vector.toml
-  - [ ] config/loki.yaml
+- [x] 設定ファイル作成
+  - [x] config/rsyslog.conf
+  - [x] config/vector.toml
+  - [x] ~~config/loki.yaml~~ (外部サーバー使用)
 
-- [ ] 動作確認
-  - [ ] docker-compose.dev.yml で環境起動
-  - [ ] サンプルログ使用した動作確認
-  - [ ] Grafanaでログ表示確認
+- [x] 動作確認
+  - [x] docker-compose.dev.yml で環境起動
+  - [x] サンプルログ使用した動作確認
+  - [ ] Grafanaでログ表示確認（外部サーバー接続後）
 
 ### Phase 5: ドキュメント整備
 
@@ -235,12 +245,28 @@ Phase 2: コア機能実装完了
   - [x] Phase 2.3: ログ監視機能実装完了（watchdog）
   - [x] Phase 2.4: ログ書き込み機能実装完了（ファイルベース方式）
   - [x] Phase 2.5: メインアプリケーション実装完了
+- [x] Phase 4: Docker環境構築完了
+  - [x] Dockerfile作成（Python 3.13-slim）
+  - [x] docker-compose.yml / docker-compose.dev.yml作成
+  - [x] Vector/rsyslog設定ファイル作成
+  - [x] 動作確認完了（ファイル検出 → パース → Vector出力）
+  - [x] バグ修正: SQLiteスレッドセーフ対応
+  - [x] バグ修正: main.pyのパーサー呼び出し修正
+- [x] Phase 3: テスト拡充（ユニットテスト完了）
+  - [x] test_parser.py (11テスト、91%カバレッジ)
+  - [x] test_writer.py (9テスト、85%カバレッジ)
+  - [x] test_database.py (8テスト、100%カバレッジ)
+  - [x] test_watcher.py (7テスト、85%カバレッジ)
+  - [x] test_condition_evaluator.py (19テスト、100%カバレッジ)
+  - [x] conftest.py 共通フィクスチャ作成
+  - [x] Pydantic V2 ConfigDict移行（警告解消）
+  - [x] CRITICALルールテスト対応
 
 ## 次のアクション
 
-Phase 3: テスト拡充、またはPhase 4: Docker環境構築
+Phase 3: 統合テスト追加、Phase 5: ドキュメント整備
 
-推奨: Phase 4を優先（実環境で動作確認してからテストを拡充）
+推奨: 現在75%カバレッジ達成。統合テストを追加するか、ドキュメント整備に進む
 
 ## 備考
 

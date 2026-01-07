@@ -5,20 +5,41 @@ from pathlib import Path
 import pytest
 
 from src.collector.parser import LogParser
+from src.models.config import CriticalRule
 
 
 class TestLogParser:
     """LogParserクラスのテスト"""
 
     @pytest.fixture
-    def parser(self) -> LogParser:
-        """パーサーインスタンス"""
-        return LogParser()
+    def critical_rules(self) -> list[CriticalRule]:
+        """CRITICALルールのフィクスチャ"""
+        return [
+            CriticalRule(
+                name="exception",
+                type="pattern",
+                pattern="Exception thrown",
+                enabled=True,
+            ),
+            CriticalRule(
+                name="error_termination",
+                type="pattern",
+                pattern="エラー.*終了します",
+                enabled=True,
+            ),
+            CriticalRule(
+                name="failed",
+                type="pattern",
+                pattern="failed to",
+                case_sensitive=False,
+                enabled=True,
+            ),
+        ]
 
     @pytest.fixture
-    def sample_log_dir(self) -> Path:
-        """サンプルログディレクトリ"""
-        return Path("tmp/sample_log")
+    def parser(self, critical_rules: list[CriticalRule]) -> LogParser:
+        """パーサーインスタンス"""
+        return LogParser(critical_rules=critical_rules)
 
     def test_parse_txt_log_success(self, parser: LogParser, sample_log_dir: Path) -> None:
         """TXTログ解析成功ケース"""

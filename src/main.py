@@ -84,7 +84,9 @@ class LogCollectorApp:
             logger.info(f"ログファイル処理開始: {task_id}")
 
             # ログパース
-            integrated_log = self.parser.parse(txt_path, json_path)
+            txt_data = self.parser.parse_txt_log(txt_path)
+            json_data = self.parser.parse_json_log(json_path)
+            integrated_log = self.parser.integrate_logs(txt_data, json_data)
 
             # ファイル書き込み
             vector_file, syslog_file = self.writer.write(integrated_log)

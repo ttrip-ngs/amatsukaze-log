@@ -74,8 +74,7 @@ class ErrorCounts(BaseModel):
     no_drcs_map: int = Field(default=0, alias="no-drcs-map")
     decode_audio_failed: int = Field(default=0, alias="decode-audio-failed")
 
-    class Config:
-        populate_by_name = True
+    model_config = {"populate_by_name": True}
 
 
 class OutFile(BaseModel):

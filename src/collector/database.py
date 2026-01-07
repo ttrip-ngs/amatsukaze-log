@@ -5,6 +5,7 @@
 
 import logging
 import sqlite3
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -15,6 +16,7 @@ class LogDatabase:
     """ログ処理管理データベース
 
     SQLiteで処理済みログを管理し、重複処理を防止
+    スレッドセーフな実装
     """
 
     def __init__(self, db_path: Path):
@@ -25,13 +27,15 @@ class LogDatabase:
         """
         self.db_path = Path(db_path)
         self.conn: sqlite3.Connection | None = None
+        self._lock = threading.Lock()
         self._initialize_db()
 
     def _initialize_db(self) -> None:
         """データベース初期化"""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.conn = sqlite3.connect(str(self.db_path))
+        # check_same_thread=Falseでマルチスレッド対応
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
 
         cursor = self.conn.cursor()
@@ -60,9 +64,12 @@ class LogDatabase:
         if not self.conn:
             raise RuntimeError("データベース未初期化")
 
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT task_id FROM processed_logs WHERE task_id = ?", (task_id,))
-        return cursor.fetchone() is not None
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT task_id FROM processed_logs WHERE task_id = ?", (task_id,)
+            )
+            return cursor.fetchone() is not None
 
     def mark_as_processed(
         self,
@@ -82,20 +89,27 @@ class LogDatabase:
         if not self.conn:
             raise RuntimeError("データベース未初期化")
 
-        cursor = self.conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO processed_logs
-                (task_id, file_path, vector_file, syslog_file, updated_at)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(task_id) DO UPDATE SET
-                vector_file = excluded.vector_file,
-                syslog_file = excluded.syslog_file,
-                updated_at = excluded.updated_at
-            """,
-            (task_id, file_path, vector_file, syslog_file, datetime.now().isoformat()),
-        )
-        self.conn.commit()
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO processed_logs
+                    (task_id, file_path, vector_file, syslog_file, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(task_id) DO UPDATE SET
+                    vector_file = excluded.vector_file,
+                    syslog_file = excluded.syslog_file,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    task_id,
+                    file_path,
+                    vector_file,
+                    syslog_file,
+                    datetime.now().isoformat(),
+                ),
+            )
+            self.conn.commit()
         logger.debug(f"処理済み記録: {task_id}")
 
     def cleanup_old_records(self, days: int = 30) -> int:
@@ -112,12 +126,13 @@ class LogDatabase:
 
         cutoff_date = (datetime.now() - timedelta(days=days)).isoformat()
 
-        cursor = self.conn.cursor()
-        cursor.execute(
-            "DELETE FROM processed_logs WHERE processed_at < ?", (cutoff_date,)
-        )
-        deleted = cursor.rowcount
-        self.conn.commit()
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "DELETE FROM processed_logs WHERE processed_at < ?", (cutoff_date,)
+            )
+            deleted = cursor.rowcount
+            self.conn.commit()
 
         logger.info(f"古いレコード削除: {deleted}件 (保持期間: {days}日)")
         return deleted
